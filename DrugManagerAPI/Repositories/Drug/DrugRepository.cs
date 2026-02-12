@@ -14,11 +14,20 @@ namespace DrugManager.Repositories.Drug
     {
         private readonly string _connStr = ConfigurationManager.ConnectionStrings["Oracle-xe21-Training"].ConnectionString;
 
-        public async Task<DrugEntity> GetByCodeAsync(string code)
+        public async Task<PagedResult<DrugEntity>> GetPagedAsync(string keyword, int page, int pageSize)
         {
+            var result = new PagedResult<DrugEntity>
+            {
+                Items = new List<DrugEntity>()
+            };
+
+            var offset = (page - 1) * pageSize;
+
             using (var conn = new OracleConnection(_connStr))
             {
                 await conn.OpenAsync();
+
+                #region DATA
 
                 using (var cmd = conn.CreateCommand())
                 {
@@ -27,25 +36,41 @@ namespace DrugManager.Repositories.Drug
                     var sb = new StringBuilder();
 
                     sb.AppendLine("SELECT");
-                    sb.AppendLine("  DRUG_ID,");
-                    sb.AppendLine("	 DRUG_CODE,");
-                    sb.AppendLine("	 DRUG_NAME,");
-                    sb.AppendLine("	 DRUG_NAME_EN,");
-                    sb.AppendLine("	 FORM_TYPE,");
-                    sb.AppendLine("	 UNIT,");
-                    sb.AppendLine("	 IS_CONTROLLED");
+                    sb.AppendLine("	DRUG_ID,");
+                    sb.AppendLine("	DRUG_CODE,");
+                    sb.AppendLine("	DRUG_NAME,");
+                    sb.AppendLine("	DRUG_NAME_EN,");
+                    sb.AppendLine("	FORM_TYPE,");
+                    sb.AppendLine("	UNIT,");
+                    sb.AppendLine("	IS_CONTROLLED");
                     sb.AppendLine("FROM DRUGS");
                     sb.AppendLine("WHERE IS_ACTIVE = 'Y'");
-                    sb.AppendLine("	 AND DRUG_CODE = :DrugCode");
+                    sb.AppendLine("	AND (");
+                    sb.AppendLine("		:keyword IS NULL");
+                    sb.AppendLine("		OR DRUG_CODE LIKE '%' || :keyword || '%'");
+                    sb.AppendLine("		OR DRUG_NAME LIKE '%' || :keyword || '%'");
+                    sb.AppendLine("	)");
+                    sb.AppendLine("ORDER BY DRUG_CODE DESC");
+                    sb.AppendLine("OFFSET :offset ROWS FETCH NEXT :pageSize ROWS ONLY");
 
                     cmd.CommandText = sb.ToString();
-                    cmd.Parameters.Add(new OracleParameter("DrugCode", OracleDbType.Varchar2) { Value = code });
+
+                    var keywordParam = new OracleParameter("keyword", OracleDbType.Varchar2);
+
+                    if (string.IsNullOrWhiteSpace(keyword))
+                        keywordParam.Value = DBNull.Value;
+                    else
+                        keywordParam.Value = keyword;
+
+                    cmd.Parameters.Add(keywordParam);
+                    cmd.Parameters.Add(new OracleParameter("offset", OracleDbType.Int32) { Value = offset });
+                    cmd.Parameters.Add(new OracleParameter("pageSize", OracleDbType.Int32) { Value = pageSize });
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
-                        if (await reader.ReadAsync())
+                        while (await reader.ReadAsync())
                         {
-                            return new DrugEntity
+                            result.Items.Add(new DrugEntity
                             {
                                 DrugId = reader.GetInt32(0),
                                 DrugCode = reader.GetString(1),
@@ -54,13 +79,48 @@ namespace DrugManager.Repositories.Drug
                                 FormType = reader.IsDBNull(4) ? "" : reader.GetString(4),
                                 Unit = reader.IsDBNull(5) ? "" : reader.GetString(5),
                                 IsControlled = reader.GetString(6) == "Y"
-                            };
+                            });
                         }
                     }
                 }
+
+                #endregion
+
+                #region COUNT
+
+                using (var countCmd = conn.CreateCommand())
+                {
+                    countCmd.BindByName = true;
+
+                    var sb = new StringBuilder();
+
+                    sb.AppendLine("SELECT COUNT(*)");
+                    sb.AppendLine("FROM DRUGS");
+                    sb.AppendLine("WHERE IS_ACTIVE = 'Y'");
+                    sb.AppendLine("    AND (");
+                    sb.AppendLine("		:keyword IS NULL");
+                    sb.AppendLine("		OR DRUG_CODE LIKE '%' || :keyword || '%'");
+                    sb.AppendLine("		OR DRUG_NAME LIKE '%' || :keyword || '%'");
+                    sb.AppendLine("	)");
+
+                    countCmd.CommandText = sb.ToString();
+
+                    var keywordParam = new OracleParameter("keyword", OracleDbType.Varchar2);
+
+                    if (string.IsNullOrWhiteSpace(keyword))
+                        keywordParam.Value = DBNull.Value;
+                    else
+                        keywordParam.Value = keyword;
+
+                    countCmd.Parameters.Add(keywordParam);
+
+                    result.Total = Convert.ToInt32(await countCmd.ExecuteScalarAsync());
+                }
+
+                #endregion
             }
 
-            return null;
+            return result;
         }
 
         public async Task<bool> CreateDrugAsync(CreateDrugRequestModel req)

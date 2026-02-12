@@ -10,19 +10,19 @@ namespace DrugManagerAPI.Controllers
     [RoutePrefix("api/drug")]
     public class DrugController : ApiController
     {
-        private readonly DrugRepository _repo = new DrugRepository();
+        private readonly DrugRepository _drugRepository = new DrugRepository();
 
-        // ======================
-        // 查 Code
-        // GET /api/drug/A001
-        // ======================
+        // ============================
+        // 查詢藥品清單 (分頁 + 關鍵字)
+        // GET /api/drug?keyword=xxx&page=1&pageSize=10
+        // ============================
         [HttpGet]
-        [Route("{code}")]
-        public async Task<IHttpActionResult> Get(string code)
+        [Route("")]
+        public async Task<IHttpActionResult> Get(string keyword = null, int page = 1, int pageSize = 10)
         {
             try
             {
-                var entity = await _repo.GetByCodeAsync(code);
+                var entity = await _drugRepository.GetPagedAsync(keyword, page, pageSize);
 
                 if (entity == null)
                 {
@@ -49,24 +49,13 @@ namespace DrugManagerAPI.Controllers
             }
         }
 
-        [HttpGet]
-        [Route("")]
-        public async Task<IHttpActionResult> GetByName(string name)
-        {
-            return Json(new ApiResponse
-            {
-                Success = false,
-                ErrorMessage = "尚未實作此功能"
-            });
-        }
-
         [HttpPost]
         [Route("")]
         public async Task<IHttpActionResult> Create(CreateDrugRequestModel model)
         {
             try
             {
-                var success = await _repo.CreateDrugAsync(model);
+                var success = await _drugRepository.CreateDrugAsync(model);
 
                 return Json(new ApiResponse
                 {
@@ -90,7 +79,7 @@ namespace DrugManagerAPI.Controllers
         {
             try
             {
-                var success = await _repo.UpdateDrugByCodeAsync(code, model);
+                var success = await _drugRepository.UpdateDrugByCodeAsync(code, model);
 
                 return Json(new ApiResponse
                 {
@@ -114,7 +103,7 @@ namespace DrugManagerAPI.Controllers
         {
             try
             {
-                var success = await _repo.DeleteDrugByCodeAsync(code);
+                var success = await _drugRepository.DeleteDrugByCodeAsync(code);
 
                 return Json(new ApiResponse
                 {
