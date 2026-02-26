@@ -72,13 +72,13 @@ namespace DrugManager.Repositories.Drug
                         {
                             result.Items.Add(new DrugEntity
                             {
-                                DrugId = reader.GetInt32(0),
-                                DrugCode = reader.GetString(1),
-                                DrugName = reader.GetString(2),
-                                DrugNameEn = reader.IsDBNull(3) ? "" : reader.GetString(3),
-                                FormType = reader.IsDBNull(4) ? "" : reader.GetString(4),
-                                Unit = reader.IsDBNull(5) ? "" : reader.GetString(5),
-                                IsControlled = reader.GetString(6) == "Y"
+                                DrugId = Convert.ToInt32(reader["DRUG_ID"]),
+                                DrugCode = reader["DRUG_CODE"].ToString(),
+                                DrugName = reader["DRUG_NAME"].ToString(),
+                                DrugNameEn = reader["DRUG_NAME_EN"]?.ToString() ?? "",
+                                FormType = reader["FORM_TYPE"]?.ToString() ?? "",
+                                Unit = reader["UNIT"]?.ToString() ?? "",
+                                IsControlled = reader["IS_CONTROLLED"]?.ToString() == "Y"
                             });
                         }
                     }
